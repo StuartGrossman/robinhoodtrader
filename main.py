@@ -1164,12 +1164,23 @@ class SPYExpandedTerminal:
                     r'(\d+\.\d{2,4})\s*High',  # Price followed by "High"
                 ],
                 'low': [
-                    r'Low[:\s]*\$?(\d+\.\d{2,4})',
-                    r'Low\s*\$?(\d+\.\d{2,4})',
-                    r'Day Low[:\s]*\$?(\d+\.\d{2,4})',
-                    r'Daily Low[:\s]*\$?(\d+\.\d{2,4})',
-                    r'Low.*?\$(\d+\.\d{2,4})',
-                    r'(\d+\.\d{2,4})\s*Low',  # Price followed by "Low"
+                    r'Low[:\s]*\$?(0?\.\d{2,4})',  # Look for prices starting with 0. or just .
+                    r'Low\s*\$?(0?\.\d{2,4})',
+                    r'Day Low[:\s]*\$?(0?\.\d{2,4})',
+                    r'Daily Low[:\s]*\$?(0?\.\d{2,4})',
+                    r'Low.*?\$(0?\.\d{2,4})',
+                    r'(0?\.\d{2,4})\s*Low',  # Price followed by "Low"
+                    # Special pattern to get the second price after High (which should be Low)
+                    r'High[:\s]*\$?0?\.\d{2,4}[^\d]+(0?\.\d{2,4})',
+                    # Look for Low in a table/list structure after High
+                    r'High.*?</?\w+>.*?Low.*?(0?\.\d{2,4})',
+                    # Look for pattern where Low value might be in next element/line
+                    r'Low[^0-9\$]{0,20}(0?\.\d{2,4})',
+                    # Fallback patterns that look for any decimal under 10
+                    r'Low[:\s]*\$?(\d{1}\.\d{2,4})',  # Single digit prices
+                    r'Low.*?\$(\d{1}\.\d{2,4})',
+                    # Last resort - any price after High that's under 10
+                    r'High[:\s]*\$?\d+\.\d{2,4}[^\d]+(\d{1,2}\.\d{2,4})',
                 ],
                 'iv': [
                     r'(?:Implied\s+)?(?:Vol|Volatility)[:\s]+(\d+\.\d+)%?',
@@ -1390,6 +1401,55 @@ class SPYExpandedTerminal:
                     if "0.0339" in content:
                         self.log(f"    ✅ Found vega: 0.0339")
                     
+                    # Special debugging for Low extraction since it's failing
+                    if 'low' not in data:
+                        self.log(f"  🔍 DEBUG: Low value not found, investigating...")
+                        
+                        # Find all occurrences of "low" in the content
+                        low_indices = []
+                        for match in re.finditer(r'low', content, re.IGNORECASE):
+                            low_indices.append(match.start())
+                        
+                        self.log(f"  📍 Found {len(low_indices)} occurrences of 'low' in content")
+                        
+                        # Look at context around each "low" occurrence
+                        for idx, pos in enumerate(low_indices[:5]):  # Check first 5 occurrences
+                            context_start = max(0, pos - 50)
+                            context_end = min(len(content), pos + 50)
+                            context = content[context_start:context_end]
+                            self.log(f"  📍 Low context {idx + 1}: ...{context}...")
+                            
+                            # Try to extract any numbers near this "low"
+                            numbers_near = re.findall(r'\d+\.\d{2,4}', context)
+                            if numbers_near:
+                                self.log(f"    💡 Numbers near 'low': {numbers_near}")
+                        
+                        # Try more aggressive patterns
+                        aggressive_patterns = [
+                            # Look for any number within 100 chars after "low"
+                            r'low.{0,100}?(\d+\.\d{2,4})',
+                            # Look for any number within 100 chars before "low"
+                            r'(\d+\.\d{2,4}).{0,100}?low',
+                            # Look for "Low" followed by any non-digit chars then a number
+                            r'Low[^\d]{0,50}(\d+\.\d{2,4})',
+                            # Look for numbers between High and next section
+                            r'High[:\s]*\$?(\d+\.\d{2,4})[^0-9]+(\d+\.\d{2,4})',
+                            # Look for second number after High
+                            r'High.*?(\d+\.\d{2,4}).*?(\d+\.\d{2,4})',
+                        ]
+                        
+                        for pattern in aggressive_patterns:
+                            matches = re.findall(pattern, content, re.IGNORECASE | re.DOTALL)
+                            if matches:
+                                self.log(f"  🎯 Aggressive pattern '{pattern[:30]}...' found: {matches}")
+                                if isinstance(matches[0], tuple) and len(matches[0]) > 1:
+                                    # For patterns with multiple groups, try the second one as low
+                                    potential_low = matches[0][1]
+                                    self.log(f"  💡 Potential low value from tuple: {potential_low}")
+                                elif isinstance(matches[0], str):
+                                    potential_low = matches[0]
+                                    self.log(f"  💡 Potential low value: {potential_low}")
+                    
                     # Look for high/low values specifically
                     high_low_numbers = re.findall(r'(\d+\.\d{2,4})\s*(?:high|low)', content, re.IGNORECASE)
                     if high_low_numbers:
@@ -1417,6 +1477,35 @@ class SPYExpandedTerminal:
                     with open(html_debug_file, 'w', encoding='utf-8') as f:
                         f.write(content)
                     self.log(f"  📄 HTML content saved to: {html_debug_file}")
+                except:
+                    pass
+            
+            # Validate high/low values before returning
+            if 'high' in data:
+                try:
+                    high_val = float(data['high'])
+                    # If high is > 50, it's probably a stock price, not option price
+                    if high_val > 50:
+                        self.log(f"  ⚠️ High value {high_val} seems like stock price, removing")
+                        del data['high']
+                        extracted_fields -= 1
+                except:
+                    pass
+            
+            if 'low' in data:
+                try:
+                    low_val = float(data['low'])
+                    # If low is > 50, it's probably a stock price, not option price
+                    if low_val > 50:
+                        self.log(f"  ⚠️ Low value {low_val} seems like stock price, removing")
+                        del data['low']
+                        extracted_fields -= 1
+                    # Also check if low is greater than high (if we have both)
+                    elif 'high' in data:
+                        high_val = float(data.get('high', 0))
+                        if low_val > high_val and high_val > 0:
+                            self.log(f"  ⚠️ Low {low_val} > High {high_val}, swapping")
+                            data['high'], data['low'] = data['low'], data['high']
                 except:
                     pass
             
