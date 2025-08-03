@@ -1,0 +1,140 @@
+{
+  "timestamp": "2025-08-02T12:57:25.166343",
+  "spy_data": {
+    "current_price": 621.7100219726562,
+    "rsi_1m": 45.159739448124384,
+    "rsi_5m": 49.39082600761067,
+    "timestamp": "2025-08-02T12:57:13.419449"
+  },
+  "options_data": [
+    {
+      "price_cents": 8,
+      "price_text": "$0.08",
+      "type": "call",
+      "element_text": "Found $0.08 on page",
+      "timestamp": "2025-08-02T12:57:19.747855"
+    },
+    {
+      "price_cents": 8,
+      "price_text": "$0.08",
+      "type": "put",
+      "element_text": "Found $0.08 on page",
+      "timestamp": "2025-08-02T12:57:23.070283"
+    },
+    {
+      "price_cents": 10,
+      "price_text": "$0.10",
+      "type": "put",
+      "element_text": "Found $0.10 on page",
+      "timestamp": "2025-08-02T12:57:23.081868"
+    },
+    {
+      "price_cents": 12,
+      "price_text": "$0.12",
+      "type": "put",
+      "element_text": "Found $0.12 on page",
+      "timestamp": "2025-08-02T12:57:23.095563"
+    },
+    {
+      "price_cents": 14,
+      "price_text": "$0.14",
+      "type": "put",
+      "element_text": "Found $0.14 on page",
+      "timestamp": "2025-08-02T12:57:23.112518"
+    },
+    {
+      "price_cents": 8,
+      "price_text": "$0.08",
+      "type": "unknown",
+      "element_text": "Found $0.08 on page",
+      "timestamp": "2025-08-02T12:57:25.166237"
+    }
+  ],
+  "recommendations": [
+    {
+      "option": {
+        "price_cents": 8,
+        "price_text": "$0.08",
+        "type": "call",
+        "element_text": "Found $0.08 on page",
+        "timestamp": "2025-08-02T12:57:19.747855"
+      },
+      "score": 3,
+      "analysis": [
+        "Very cheap premium"
+      ],
+      "recommendation": "BUY"
+    },
+    {
+      "option": {
+        "price_cents": 8,
+        "price_text": "$0.08",
+        "type": "put",
+        "element_text": "Found $0.08 on page",
+        "timestamp": "2025-08-02T12:57:23.070283"
+      },
+      "score": 3,
+      "analysis": [
+        "Very cheap premium"
+      ],
+      "recommendation": "BUY"
+    },
+    {
+      "option": {
+        "price_cents": 10,
+        "price_text": "$0.10",
+        "type": "put",
+        "element_text": "Found $0.10 on page",
+        "timestamp": "2025-08-02T12:57:23.081868"
+      },
+      "score": 3,
+      "analysis": [
+        "Very cheap premium"
+      ],
+      "recommendation": "BUY"
+    },
+    {
+      "option": {
+        "price_cents": 8,
+        "price_text": "$0.08",
+        "type": "unknown",
+        "element_text": "Found $0.08 on page",
+        "timestamp": "2025-08-02T12:57:25.166237"
+      },
+      "score": 3,
+      "analysis": [
+        "Very cheap premium",
+        "Option type unclear"
+      ],
+      "recommendation": "BUY"
+    },
+    {
+      "option": {
+        "price_cents": 12,
+        "price_text": "$0.12",
+        "type": "put",
+        "element_text": "Found $0.12 on page",
+        "timestamp": "2025-08-02T12:57:23.095563"
+      },
+      "score": 2,
+      "analysis": [
+        "Reasonable premium"
+      ],
+      "recommendation": "CONSIDER"
+    },
+    {
+      "option": {
+        "price_cents": 14,
+        "price_text": "$0.14",
+        "type": "put",
+        "element_text": "Found $0.14 on page",
+        "timestamp": "2025-08-02T12:57:23.112518"
+      },
+      "score": 1,
+      "analysis": [
+        "Higher premium"
+      ],
+      "recommendation": "CONSIDER"
+    }
+  ]
+}

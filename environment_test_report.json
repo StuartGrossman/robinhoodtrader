@@ -1,0 +1,192 @@
+{
+  "timestamp": "2025-08-02T16:11:01.549838",
+  "results": {
+    "Core Dependencies": {
+      "asyncio": {
+        "status": "\u2705",
+        "description": "Async I/O support"
+      },
+      "json": {
+        "status": "\u2705",
+        "description": "JSON data handling"
+      },
+      "pathlib": {
+        "status": "\u2705",
+        "description": "Path handling"
+      },
+      "datetime": {
+        "status": "\u2705",
+        "description": "Date/time handling"
+      },
+      "numpy": {
+        "status": "\u2705",
+        "description": "Numerical computing"
+      },
+      "pandas": {
+        "status": "\u2705",
+        "description": "Data manipulation"
+      }
+    },
+    "Automation Dependencies": {
+      "playwright": {
+        "status": "\u2705",
+        "description": "Web automation"
+      },
+      "cryptography": {
+        "status": "\u2705",
+        "description": "Encryption utilities"
+      },
+      "python-dotenv": {
+        "status": "\u274c",
+        "description": "Environment variables",
+        "error": "No module named 'python-dotenv'"
+      }
+    },
+    "Financial Dependencies": {
+      "yfinance": {
+        "status": "\u2705",
+        "description": "Yahoo Finance data"
+      },
+      "talib": {
+        "status": "\u2705",
+        "description": "Technical Analysis Library"
+      },
+      "mplfinance": {
+        "status": "\u2705",
+        "description": "Financial plotting"
+      },
+      "plotly": {
+        "status": "\u2705",
+        "description": "Interactive plotting"
+      },
+      "scikit-learn": {
+        "status": "\u274c",
+        "description": "Machine learning",
+        "error": "No module named 'scikit-learn'"
+      }
+    },
+    "Firebase Dependencies": {
+      "firebase_admin": {
+        "status": "\u2705",
+        "description": "Firebase Admin SDK"
+      },
+      "pyrebase": {
+        "status": "\u2705",
+        "description": "Pyrebase4 client"
+      },
+      "google.cloud.firestore": {
+        "status": "\u2705",
+        "description": "Firestore client"
+      }
+    },
+    "System Requirements": {
+      "python_version": {
+        "status": "\u2705",
+        "version": "3.13"
+      },
+      "platform": {
+        "status": "\u2705",
+        "platform": "darwin"
+      },
+      "architecture": {
+        "status": "\u2705",
+        "architecture": "64-bit"
+      },
+      "async_support": {
+        "status": "\u2705"
+      },
+      "json_support": {
+        "status": "\u2705"
+      },
+      "file_io": {
+        "status": "\u2705"
+      }
+    },
+    "Data Processing": {
+      "numpy": {
+        "status": "\u2705",
+        "mean": 3.0,
+        "std": 1.4142135623730951
+      },
+      "pandas": {
+        "status": "\u2705",
+        "rows": 5,
+        "columns": 3
+      },
+      "json_processing": {
+        "status": "\u2705",
+        "data_size": 127
+      }
+    },
+    "Technical Analysis": {
+      "talib": {
+        "status": "\u2705",
+        "sma": 105.8,
+        "rsi": 74.62537462537463
+      },
+      "yfinance": {
+        "status": "\u2705",
+        "ticker": "SPY"
+      }
+    },
+    "Automation Capabilities": {
+      "playwright": {
+        "status": "\u2705",
+        "module": "async_playwright"
+      },
+      "cryptography": {
+        "status": "\u2705",
+        "key_length": 44
+      }
+    },
+    "Project Structure": {
+      "dir_src": {
+        "status": "\u2705",
+        "path": "src"
+      },
+      "dir_tests": {
+        "status": "\u2705",
+        "path": "tests"
+      },
+      "dir_data": {
+        "status": "\u2705",
+        "path": "data"
+      },
+      "dir_logs": {
+        "status": "\u2705",
+        "path": "logs"
+      },
+      "dir_config": {
+        "status": "\u2705",
+        "path": "config"
+      },
+      "file_requirements.txt": {
+        "status": "\u2705",
+        "size": 1745
+      },
+      "file_main.py": {
+        "status": "\u2705",
+        "size": 8976
+      },
+      "file_src/robinhood_automation.py": {
+        "status": "\u2705",
+        "size": 28118
+      },
+      "file_tests/__init__.py": {
+        "status": "\u2705",
+        "size": 16
+      }
+    },
+    "Environment Variables": {
+      "dotenv": {
+        "status": "\u2705",
+        "env_file": "loaded"
+      },
+      "env_access": {
+        "status": "\u2705",
+        "test_var": "default_value"
+      }
+    }
+  },
+  "success": false
+}
