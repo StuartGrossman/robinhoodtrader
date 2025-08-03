@@ -1162,26 +1162,43 @@ class SPYExpandedTerminal:
                     r'(?:Day\s+)?High[:\s]+\$?(\d+\.\d{2,4})',
                     r'High\s+\$?(\d+\.\d{2,4})',
                     r'High[:\s]*\$?(\d+\.\d{2,4})',  # Robinhood format
+                    r'High[:\s]*(\d+\.\d{2,4})',  # Without $ symbol
+                    r'High.*?\$(\d+\.\d{2,4})',  # Match High followed by $price
+                    r'High.*?(\d+\.\d{2,4})',  # Match High followed by price
+                    r'High[:\s]*(\d+\.\d{2,4})',  # Simple High pattern
+                    r'High\s+(\d+\.\d{2,4})',  # High followed by space and number
                 ],
                 'low': [
                     r'(?:Day\s+)?Low[:\s]+\$?(\d+\.\d{2,4})',
                     r'Low\s+\$?(\d+\.\d{2,4})',
                     r'Low[:\s]*\$?(\d+\.\d{2,4})',  # Robinhood format
+                    r'Low[:\s]*(\d+\.\d{2,4})',  # Without $ symbol
+                    r'Low.*?\$(\d+\.\d{2,4})',  # Match Low followed by $price
+                    r'Low.*?(\d+\.\d{2,4})',  # Match Low followed by price
+                    r'Low[:\s]*(\d+\.\d{2,4})',  # Simple Low pattern
+                    r'Low\s+(\d+\.\d{2,4})',  # Low followed by space and number
                 ],
                 'iv': [
                     r'(?:Implied\s+)?(?:Vol|Volatility)[:\s]+(\d+\.\d+)%?',
                     r'IV[:\s]+(\d+\.\d+)%?',
                     r'Implied Volatility[:\s]*(\d+\.\d+)%?',  # Robinhood format
+                    r'IV[:\s]*(\d+\.\d+)%?',  # IV format
+                    r'Implied.*?(\d+\.\d+)%?',  # Match Implied followed by percentage
                 ],
                 'strike': [
                     r'Strike[:\s]+\$?(\d+)',
                     r'Strike\s+Price[:\s]+\$?(\d+)',
                     r'Strike[:\s]*\$?(\d+)',  # Robinhood format
+                    r'Strike[:\s]*(\d+)',  # Without $ symbol
+                    r'Strike.*?\$(\d+)',  # Match Strike followed by $price
+                    r'Strike.*?(\d+)',  # Match Strike followed by price
                 ],
                 'expiration': [
                     r'(?:Exp|Expires?)[:\s]+(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',
                     r'Expiration[:\s]+(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',
                     r'Expires[:\s]*(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',  # Robinhood format
+                    r'Exp[:\s]*(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',  # Short form
+                    r'Expiration.*?(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',  # Match Expiration followed by date
                 ]
             }
             
@@ -1248,15 +1265,72 @@ class SPYExpandedTerminal:
                                 data[greek] = greek_match.group(1)
                                 extracted_fields += 1
                                 self.log(f"    ✅ {greek}: {greek_match.group(1)} (direct match)")
-                except Exception as direct_error:
-                    self.log(f"    ⚠️ Direct matching failed: {direct_error}")
+                    
+                    # Look for missing fields with aggressive patterns
+                    missing_fields = {
+                        'strike': r'(\d{3,4})\s*(?:strike|strike price)',
+                        'expiration': r'(\d{1,2}/\d{1,2}/\d{2,4})',
+                        'high': r'high[:\s]*(\d+\.\d{2,4})',
+                        'low': r'low[:\s]*(\d+\.\d{2,4})',
+                        'iv': r'(?:implied|iv)[:\s]*(\d+\.\d+)%?'
+                    }
+                    
+                    for field, pattern in missing_fields.items():
+                        if field not in data or data[field] == 'N/A':
+                            field_match = re.search(pattern, content, re.IGNORECASE)
+                            if field_match:
+                                data[field] = field_match.group(1)
+                                extracted_fields += 1
+                                self.log(f"    ✅ {field}: {field_match.group(1)} (aggressive match)")
+                    
+                        # Look for daily range specifically in expanded contract
+                        daily_range_patterns = {
+                            'high': [
+                                r'Day High[:\s]*\$?(\d+\.\d{2,4})',
+                                r'Daily High[:\s]*\$?(\d+\.\d{2,4})',
+                                r'High[:\s]*\$?(\d+\.\d{2,4})',
+                                r'High\s+\$?(\d+\.\d{2,4})'
+                            ],
+                            'low': [
+                                r'Day Low[:\s]*\$?(\d+\.\d{2,4})',
+                                r'Daily Low[:\s]*\$?(\d+\.\d{2,4})',
+                                r'Low[:\s]*\$?(\d+\.\d{2,4})',
+                                r'Low\s+\$?(\d+\.\d{2,4})'
+                            ]
+                        }
+                        
+                        for field, patterns in daily_range_patterns.items():
+                            if field not in data or data[field] == 'N/A':
+                                for pattern in patterns:
+                                    field_match = re.search(pattern, content, re.IGNORECASE)
+                                    if field_match:
+                                        data[field] = field_match.group(1)
+                                        extracted_fields += 1
+                                        self.log(f"    ✅ {field}: {field_match.group(1)} (daily range match)")
+                                        break
+                except Exception as fallback_error:
+                    self.log(f"    ⚠️ Fallback extraction error: {fallback_error}")
             
-            # Take screenshot of the expanded contract
-            try:
-                screenshot_path = f"screenshots/expanded_{self.option_type}_{price_cents:02d}_initial.png"
-                await page.screenshot(path=screenshot_path)
-            except:
-                pass
+            # Validate and fix High/Low values
+            if 'high' in data and 'low' in data:
+                try:
+                    high_val = float(data['high'])
+                    low_val = float(data['low'])
+                    
+                    # If values seem swapped (high is much smaller than low), swap them
+                    if high_val < low_val and high_val < 10 and low_val > 100:
+                        self.log(f"    ⚠️ High/Low values appear swapped: High={high_val}, Low={low_val}")
+                        data['high'], data['low'] = data['low'], data['high']
+                        self.log(f"    ✅ Swapped High/Low values: High={data['high']}, Low={data['low']}")
+                    
+                    # Validate that high is greater than low
+                    if high_val < low_val:
+                        self.log(f"    ⚠️ High ({high_val}) is less than Low ({low_val}) - clearing values")
+                        data['high'] = 'N/A'
+                        data['low'] = 'N/A'
+                        
+                except (ValueError, TypeError):
+                    self.log(f"    ⚠️ Could not validate High/Low values: High={data.get('high')}, Low={data.get('low')}")
             
             self.log(f"  📊 Extracted {extracted_fields} data fields from expanded contract")
             
@@ -1402,10 +1476,10 @@ class SPYExpandedTerminal:
         try:
             tracker = self.contracts[contract_key]
             
-            # Create matplotlib figure
-            fig = Figure(figsize=(14, 10), facecolor='#0d1117')
+            # Create matplotlib figure with larger size and better spacing
+            fig = Figure(figsize=(16, 12), facecolor='#0d1117')
             
-            # Create 6 subplots for comprehensive data
+            # Create 6 subplots with better spacing
             ax1 = fig.add_subplot(2, 3, 1, facecolor='#161b22')  # Price
             ax2 = fig.add_subplot(2, 3, 2, facecolor='#161b22')  # Volume
             ax3 = fig.add_subplot(2, 3, 3, facecolor='#161b22')  # Bid/Ask
@@ -1415,28 +1489,29 @@ class SPYExpandedTerminal:
             
             axes = [ax1, ax2, ax3, ax4, ax5, ax6]
             
-            # Style all axes
+            # Style all axes with better spacing
             for ax in axes:
-                ax.tick_params(colors='white', labelsize=8)
+                ax.tick_params(colors='white', labelsize=9)
                 for spine in ax.spines.values():
                     spine.set_color('white')
                 ax.grid(True, alpha=0.3, color='white')
             
-            # Set titles
+            # Set titles with better font size
             titles = ['Price Over Time', 'Volume', 'Bid/Ask Spread', 'Theta Decay', 'Gamma', 'Daily High/Low']
             for ax, title in zip(axes, titles):
-                ax.set_title(title, color='white', fontsize=10, pad=10)
+                ax.set_title(title, color='white', fontsize=11, pad=15)
             
             # Initial placeholder
             for ax in axes:
                 ax.text(0.5, 0.5, 'Collecting live data...', ha='center', va='center',
-                       transform=ax.transAxes, color='white', fontsize=9)
+                       transform=ax.transAxes, color='white', fontsize=10)
             
-            fig.tight_layout(pad=2.0)
+            # Better layout with more spacing
+            fig.tight_layout(pad=3.0, h_pad=2.0, w_pad=2.0)
             
             # Embed in tkinter
             canvas = FigureCanvasTkAgg(fig, parent_frame)
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
             
             # Store references for live updates
             tracker.figure = fig
