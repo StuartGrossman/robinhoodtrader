@@ -1259,6 +1259,30 @@ class SPYExpandedTerminal:
                                     self.log(f"    ✅ high: {high_match.group(1)} (pattern: {pattern})")
                                     break
                     
+                    # Try to extract High and Low together since they appear in proximity
+                    high_low_match = re.search(r'High[:\s]*\$?(\d+\.\d{2,4}).*?Low[:\s]*\$?(\d+\.\d{2,4})', content, re.IGNORECASE | re.DOTALL)
+                    if high_low_match:
+                        if 'high' not in data:
+                            data['high'] = high_low_match.group(1)
+                            extracted_fields += 1
+                            self.log(f"    ✅ high: {high_low_match.group(1)} (high-low pair)")
+                        if 'low' not in data:
+                            data['low'] = high_low_match.group(2)
+                            extracted_fields += 1
+                            self.log(f"    ✅ low: {high_low_match.group(2)} (high-low pair)")
+                    
+                    # Also try reverse pattern (Low before High)
+                    low_high_match = re.search(r'Low[:\s]*\$?(\d+\.\d{2,4}).*?High[:\s]*\$?(\d+\.\d{2,4})', content, re.IGNORECASE | re.DOTALL)
+                    if low_high_match:
+                        if 'low' not in data:
+                            data['low'] = low_high_match.group(1)
+                            extracted_fields += 1
+                            self.log(f"    ✅ low: {low_high_match.group(1)} (low-high pair)")
+                        if 'high' not in data:
+                            data['high'] = low_high_match.group(2)
+                            extracted_fields += 1
+                            self.log(f"    ✅ high: {low_high_match.group(2)} (low-high pair)")
+                    
                     if "Low" in content:
                         low_match = re.search(r'Low[:\s]*\$?(\d+\.\d{2,4})', content)
                         if low_match and 'low' not in data:
@@ -1271,14 +1295,29 @@ class SPYExpandedTerminal:
                                 r'Day Low[:\s]*\$?(\d+\.\d{2,4})',
                                 r'Daily Low[:\s]*\$?(\d+\.\d{2,4})',
                                 r'Low.*?\$(\d+\.\d{2,4})',
-                                r'(\d+\.\d{2,4})\s*Low'
+                                r'(\d+\.\d{2,4})\s*Low',
+                                # Look for low value that appears after high in the same context
+                                r'High.*?(\d+\.\d{2,4}).*?Low.*?(\d+\.\d{2,4})',
+                                r'High[:\s]*\$?(\d+\.\d{2,4}).*?Low[:\s]*\$?(\d+\.\d{2,4})',
+                                # Look for any price near "Low" text
+                                r'Low[:\s]*(\d+\.\d{2,4})',
+                                r'(\d+\.\d{2,4})[^0-9]*Low',
+                                # Look for low in expanded contract context
+                                r'expanded.*?Low[:\s]*\$?(\d+\.\d{2,4})',
+                                r'contract.*?Low[:\s]*\$?(\d+\.\d{2,4})',
+                                # Look for low value in the same section as other data
+                                r'(?:Volume|Open interest|Theta|Gamma).*?Low[:\s]*\$?(\d+\.\d{2,4})'
                             ]
                             for pattern in low_patterns:
-                                low_match = re.search(pattern, content)
+                                low_match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
                                 if low_match and 'low' not in data:
-                                    data['low'] = low_match.group(1)
+                                    # If pattern has multiple groups, take the last one (usually the low value)
+                                    if len(low_match.groups()) > 1:
+                                        data['low'] = low_match.group(-1)  # Last group
+                                    else:
+                                        data['low'] = low_match.group(1)
                                     extracted_fields += 1
-                                    self.log(f"    ✅ low: {low_match.group(1)} (pattern: {pattern})")
+                                    self.log(f"    ✅ low: {data['low']} (pattern: {pattern[:50]}...)")
                                     break
                     
                     # Look for Greeks with more flexible patterns
