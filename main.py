@@ -22,6 +22,7 @@ from matplotlib.figure import Figure
 import time
 import sqlite3
 import os
+import random
 
 class DatabaseManager:
     def __init__(self, db_path="data/options_data.db"):
@@ -1381,6 +1382,18 @@ class SPYExpandedTerminal:
                                      bg='#238636', fg='white', font=('SF Mono', 9))
             refresh_button.pack(pady=5)
             
+            # Add force chart update button
+            chart_button = tk.Button(tab_frame, text="📊 Force Chart Update", 
+                                   command=lambda ck=contract_key: self.force_chart_update(ck),
+                                   bg='#f85149', fg='white', font=('SF Mono', 9))
+            chart_button.pack(pady=2)
+            
+            # Add test data button for debugging
+            test_button = tk.Button(tab_frame, text="🧪 Add Test Data", 
+                                  command=lambda ck=contract_key: self.add_test_data_to_charts(ck),
+                                  bg='#d29922', fg='white', font=('SF Mono', 9))
+            test_button.pack(pady=2)
+            
         except Exception as e:
             self.log(f"❌ Error setting up tab content: {e}")
     
@@ -1442,6 +1455,9 @@ class SPYExpandedTerminal:
             
             self.log(f"📹 Starting continuous monitoring for expanded {contract_key}")
             
+            # Start timer-based chart updates
+            self.start_chart_update_timer(contract_key)
+            
             def monitor_expanded_contract():
                 """Monitor expanded contract continuously."""
                 import asyncio
@@ -1467,12 +1483,19 @@ class SPYExpandedTerminal:
                                 self.log(f"🔍 Data extraction #{screenshot_count}: FAILED - No data extracted")
                             
                             if current_data:
+                                # Add data point to tracker
                                 tracker.add_data_point(current_data)
+                                self.log(f"💾 Data point #{screenshot_count} added to tracker - Total points: {len(tracker.data_history)}")
                                 
                                 # Update GUI displays immediately with proper error handling
                                 try:
                                     self.root.after(0, lambda ck=contract_key: self.update_contract_info_display(ck))
+                                    self.log(f"🔄 GUI info display updated for {contract_key}")
+                                    
+                                    # Update charts with more detailed logging
                                     self.root.after(0, lambda ck=contract_key: self.update_live_charts(ck))
+                                    self.log(f"📊 Chart update triggered for {contract_key}")
+                                    
                                 except Exception as gui_error:
                                     self.log(f"⚠️ GUI update error for {contract_key}: {gui_error}")
                                 
@@ -1513,12 +1536,18 @@ class SPYExpandedTerminal:
                                     volume = current_data.get('volume', 'N/A')
                                     theta = current_data.get('theta', 'N/A')
                                     self.log(f"  🔄 {contract_key}: ${price} (Bid:${bid} Ask:${ask}) Vol:{volume} Θ:{theta} | Update #{screenshot_count}")
+                                
+                                # Show database save confirmation every 20 seconds
+                                if screenshot_count % 20 == 0:
+                                    self.log(f"💾 Database: Saved {screenshot_count} data points for {contract_key}")
                             
                             await asyncio.sleep(1)  # Screenshot every second
                             
                         except Exception as e:
                             if tracker.monitoring_active:
                                 self.log(f"❌ Monitoring error for {contract_key}: {e}")
+                                import traceback
+                                self.log(f"🔍 Monitoring traceback: {traceback.format_exc()}")
                             await asyncio.sleep(2)
                 
                 # Run monitoring loop
@@ -1537,6 +1566,21 @@ class SPYExpandedTerminal:
             
         except Exception as e:
             self.log(f"❌ Error starting monitoring for {contract_key}: {e}")
+    
+    def start_chart_update_timer(self, contract_key):
+        """Start timer-based chart updates."""
+        def update_charts_timer():
+            if contract_key in self.contracts:
+                tracker = self.contracts[contract_key]
+                if tracker.monitoring_active and len(tracker.data_history) > 0:
+                    self.log(f"⏰ Timer-based chart update for {contract_key} - {len(tracker.data_history)} data points")
+                    self.update_live_charts(contract_key)
+                    # Schedule next update in 2 seconds
+                    self.root.after(2000, update_charts_timer)
+        
+        # Start the timer
+        self.root.after(2000, update_charts_timer)
+        self.log(f"⏰ Started timer-based chart updates for {contract_key} (every 2 seconds)")
     
     def refresh_all_contracts(self):
         """Clear all contracts and start fresh."""
@@ -1762,6 +1806,9 @@ Screenshots: Every 1 second
                 # Show database status
                 db_data = self.db_manager.get_contract_data(contract_key, limit=5)
                 self.log(f"💾 Database: {len(db_data)} recent data points saved for {contract_key}")
+                
+                # Show chart update confirmation
+                self.log(f"🎨 Charts refreshed for {contract_key} - Canvas redrawn")
             
         except Exception as e:
             self.log(f"❌ Error updating live charts for {contract_key}: {e}")
@@ -1771,6 +1818,61 @@ Screenshots: Every 1 second
     def show(self):
         """Show this terminal window."""
         self.root.mainloop()
+    
+    def force_chart_update(self, contract_key):
+        """Force update charts for debugging."""
+        try:
+            self.log(f"🔧 FORCE CHART UPDATE for {contract_key}")
+            tracker = self.contracts[contract_key]
+            
+            self.log(f"📊 Tracker data: {len(tracker.data_history)} points")
+            if len(tracker.data_history) > 0:
+                latest = tracker.data_history[-1]
+                self.log(f"📈 Latest data: {latest}")
+            
+            # Force chart update
+            self.update_live_charts(contract_key)
+            self.log(f"✅ Force chart update completed for {contract_key}")
+            
+        except Exception as e:
+            self.log(f"❌ Force chart update error for {contract_key}: {e}")
+    
+    def add_test_data_to_charts(self, contract_key):
+        """Add test data to charts for debugging."""
+        try:
+            tracker = self.contracts[contract_key]
+            
+            # Generate some test data points
+            from datetime import datetime, timedelta
+            
+            base_price = 0.07
+            base_volume = 5
+            
+            for i in range(20):
+                # Create test data point
+                test_data = {
+                    'current_price': base_price + (random.random() - 0.5) * 0.02,
+                    'bid': base_price + (random.random() - 0.5) * 0.01,
+                    'ask': base_price + (random.random() - 0.5) * 0.01,
+                    'volume': base_volume + random.randint(-2, 2),
+                    'open_interest': base_volume + random.randint(-1, 1),
+                    'theta': -0.2163 + (random.random() - 0.5) * 0.1,
+                    'gamma': 0.0098 + (random.random() - 0.5) * 0.005,
+                    'delta': 0.0300 + (random.random() - 0.5) * 0.01,
+                    'vega': 0.0232 + (random.random() - 0.5) * 0.01,
+                    'high': base_price + random.random() * 0.03,
+                    'low': base_price - random.random() * 0.03,
+                    'timestamp': datetime.now() - timedelta(seconds=20-i)
+                }
+                
+                tracker.add_data_point(test_data)
+            
+            self.log(f"🧪 Added 20 test data points to {contract_key}")
+            self.update_live_charts(contract_key)
+            self.log(f"✅ Test data charts updated for {contract_key}")
+            
+        except Exception as e:
+            self.log(f"❌ Error adding test data to {contract_key}: {e}")
 
 def launch_calls_terminal():
     """Launch calls terminal - defined at module level for multiprocessing."""
