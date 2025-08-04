@@ -1081,12 +1081,12 @@ class SPYExpandedTerminal:
             # Enhanced extraction patterns for expanded view with Robinhood-specific patterns
             patterns = {
                 'current_price': [
-                    r'(?:Last|Price|Mark|Current)[:\s]+\$?(\d+\.\d{2,4})',
-                    r'Premium[:\s]+\$?(\d+\.\d{2,4})', 
-                    r'\$(\d+\.\d{2,4})\s*(?:Last|Current)',
-                    r'(\d+\.\d{2,4})\s*USD',  # Robinhood format
-                    r'Mark[:\s]*\$?(\d+\.\d{2,4})',  # Mark price
-                    r'Share price[:\s]*\$?(\d+\.\d{2,4})',  # Robinhood share price
+                    r'Last trade[:\s]*\$?(0?\.\d{2,4})',  # Look for "Last trade" specifically
+                    r'Last trade[:\s]*\$?(\d{1,2}\.\d{2,4})',  # Allow up to 2 digits
+                    r'Mark[:\s]*\$?(0?\.\d{2,4})',  # Mark price for options
+                    r'(?:Last|Price|Mark|Current)[:\s]+\$?(0?\.\d{2,4})',  # Option prices < $1
+                    r'Premium[:\s]+\$?(0?\.\d{2,4})', 
+                    r'\$(0?\.\d{2,4})\s*(?:Last|Current)',
                 ],
                 'bid': [
                     r'Bid[:\s]+\$?(\d+\.\d{2,4})',
@@ -1164,6 +1164,7 @@ class SPYExpandedTerminal:
                     r'(\d+\.\d{2,4})\s*High',  # Price followed by "High"
                 ],
                 'low': [
+                    r'Low[\s\n]*\$?(0?\.\d{2})',  # Low with newline/space then price
                     r'Low[:\s]*\$?(0?\.\d{2,4})',  # Look for prices starting with 0. or just .
                     r'Low\s*\$?(0?\.\d{2,4})',
                     r'Day Low[:\s]*\$?(0?\.\d{2,4})',
@@ -1183,16 +1184,24 @@ class SPYExpandedTerminal:
                     r'High[:\s]*\$?\d+\.\d{2,4}[^\d]+(\d{1,2}\.\d{2,4})',
                 ],
                 'iv': [
+                    r'Implied volatility[\s\n]*(\d+\.\d+)%',  # Implied volatility with newline
+                    r'Implied volatility[:\s]*(\d+\.\d+)%?',
                     r'(?:Implied\s+)?(?:Vol|Volatility)[:\s]+(\d+\.\d+)%?',
                     r'IV[:\s]+(\d+\.\d+)%?',
-                    r'Implied Volatility[:\s]*(\d+\.\d+)%?',  # Robinhood format
+                    r'(\d+\.\d+)%',  # Just find percentage values
                 ],
                 'strike': [
+                    r'\$(\d{3,4})\s+Call',  # $635 Call format
+                    r'\$(\d{3,4})\s+Put',   # $635 Put format
+                    r'SPY\s+\$(\d{3,4})',   # SPY $635 format
                     r'Strike[:\s]+\$?(\d+)',
                     r'Strike\s+Price[:\s]+\$?(\d+)',
                     r'Strike[:\s]*\$?(\d+)',  # Robinhood format
                 ],
                 'expiration': [
+                    r'Call\s+(\d{1,2}/\d{1,2})',  # Call 8/4 format
+                    r'Put\s+(\d{1,2}/\d{1,2})',   # Put 8/4 format
+                    r'(\d{1,2}/\d{1,2})$',         # Date at end of title
                     r'(?:Exp|Expires?)[:\s]+(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',
                     r'Expiration[:\s]+(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',
                     r'Expires[:\s]*(\d{1,2}/\d{1,2}(?:/\d{2,4})?)',  # Robinhood format
