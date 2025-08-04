@@ -1078,11 +1078,76 @@ class SPYExpandedTerminal:
                 'timestamp': datetime.now().isoformat()
             }
             
+            # DEBUG: Log specific text we're looking for
+            # Save debug HTML for analysis
+            try:
+                debug_html_path = f"screenshots/debug_extraction_{price_cents}.html"
+                with open(debug_html_path, 'w') as f:
+                    f.write(content)
+                self.log(f"  💾 Saved debug HTML to {debug_html_path}")
+            except:
+                pass
+                
+            if "Last trade" in content:
+                # Find all occurrences of "Last trade" with context
+                last_trade_contexts = []
+                for match in re.finditer(r'Last trade', content, re.IGNORECASE):
+                    start = max(0, match.start() - 50)
+                    end = min(len(content), match.end() + 100)
+                    context = content[start:end]
+                    last_trade_contexts.append(context)
+                    
+                if last_trade_contexts:
+                    self.log(f"  🔍 DEBUG: Found {len(last_trade_contexts)} 'Last trade' occurrences:")
+                    for i, ctx in enumerate(last_trade_contexts[:3]):
+                        # Clean up HTML tags for readability
+                        clean_ctx = re.sub(r'<[^>]+>', ' ', ctx)
+                        clean_ctx = re.sub(r'\s+', ' ', clean_ctx)
+                        self.log(f"    Context {i+1}: {clean_ctx.strip()}")
+                        
+            # Also look for any text containing prices
+            price_patterns = re.findall(r'\$?0\.\d{2}', content)
+            if price_patterns:
+                self.log(f"  🔍 DEBUG: Found {len(price_patterns)} option prices: {price_patterns[:10]}")
+                
+            # Look for Low specifically
+            if "Low" in content:
+                low_contexts = []
+                for match in re.finditer(r'\bLow\b', content, re.IGNORECASE):
+                    start = max(0, match.start() - 50)
+                    end = min(len(content), match.end() + 100)
+                    context = content[start:end]
+                    low_contexts.append(context)
+                    
+                if low_contexts:
+                    self.log(f"  🔍 DEBUG: Found {len(low_contexts)} 'Low' occurrences:")
+                    for i, ctx in enumerate(low_contexts[:3]):
+                        # Clean up HTML tags for readability
+                        clean_ctx = re.sub(r'<[^>]+>', ' ', ctx)
+                        clean_ctx = re.sub(r'\s+', ' ', clean_ctx)
+                        self.log(f"    Low context {i+1}: {clean_ctx.strip()}")
+            
+            # Special pattern for Robinhood's HTML structure where label and value are separated
+            # Pattern: <label>Last trade</label>...<value>$0.08</value>
+            special_patterns = [
+                (r'Last trade</div></span><div[^>]*></div><span[^>]*><div[^>]*>\$?(\d+\.\d{2})</div>', 'current_price'),
+                (r'Low</div></span><div[^>]*></div><span[^>]*><div[^>]*>\$?(\d+\.\d{2})</div>', 'low'),
+                (r'Implied volatility</div></span><div[^>]*></div><span[^>]*><div[^>]*>(\d+\.\d{2})%</div>', 'iv'),
+            ]
+            
+            # Try special patterns first
+            for pattern, field in special_patterns:
+                if field not in data:
+                    match = re.search(pattern, content)
+                    if match:
+                        data[field] = match.group(1)
+                        self.log(f"    ✅ {field}: {match.group(1)} (special HTML pattern)")
+            
             # Enhanced extraction patterns for expanded view with Robinhood-specific patterns
             patterns = {
                 'current_price': [
-                    r'Last trade[:\s]*\$?(0?\.\d{2,4})',  # Look for "Last trade" specifically
-                    r'Last trade[:\s]*\$?(\d{1,2}\.\d{2,4})',  # Allow up to 2 digits
+                    r'Last trade[:\s]*\$?(0?\.\d{2})',  # Last trade with 2 decimal places
+                    r'Last trade[:\s]*\$?(\d{1,2}\.\d{2})',  # Allow up to 2 digits
                     r'Mark[:\s]*\$?(0?\.\d{2,4})',  # Mark price for options
                     r'(?:Last|Price|Mark|Current)[:\s]+\$?(0?\.\d{2,4})',  # Option prices < $1
                     r'Premium[:\s]+\$?(0?\.\d{2,4})', 
@@ -1165,30 +1230,31 @@ class SPYExpandedTerminal:
                 ],
                 'low': [
                     r'Low[\s\n]*\$?(0?\.\d{2})',  # Low with newline/space then price
-                    r'Low[:\s]*\$?(0?\.\d{2,4})',  # Look for prices starting with 0. or just .
-                    r'Low\s*\$?(0?\.\d{2,4})',
+                    r'Low[:\s]*\$?(0?\.\d{2})',  # Look for prices starting with 0. or just .
+                    r'Low\s*\$?(0?\.\d{2})',
                     r'Day Low[:\s]*\$?(0?\.\d{2,4})',
                     r'Daily Low[:\s]*\$?(0?\.\d{2,4})',
-                    r'Low.*?\$(0?\.\d{2,4})',
-                    r'(0?\.\d{2,4})\s*Low',  # Price followed by "Low"
+                    r'Low.*?\$(0?\.\d{2})',
+                    r'(0?\.\d{2})\s*Low',  # Price followed by "Low"
                     # Special pattern to get the second price after High (which should be Low)
-                    r'High[:\s]*\$?0?\.\d{2,4}[^\d]+(0?\.\d{2,4})',
+                    r'High[:\s]*\$?0?\.\d{2,4}[^\d]+(0?\.\d{2})',
                     # Look for Low in a table/list structure after High
-                    r'High.*?</?\w+>.*?Low.*?(0?\.\d{2,4})',
+                    r'High.*?</?\w+>.*?Low.*?(0?\.\d{2})',
                     # Look for pattern where Low value might be in next element/line
-                    r'Low[^0-9\$]{0,20}(0?\.\d{2,4})',
+                    r'Low[^0-9\$]{0,20}(0?\.\d{2})',
                     # Fallback patterns that look for any decimal under 10
-                    r'Low[:\s]*\$?(\d{1}\.\d{2,4})',  # Single digit prices
-                    r'Low.*?\$(\d{1}\.\d{2,4})',
+                    r'Low[:\s]*\$?(\d{1}\.\d{2})',  # Single digit prices
+                    r'Low.*?\$(\d{1}\.\d{2})',
                     # Last resort - any price after High that's under 10
-                    r'High[:\s]*\$?\d+\.\d{2,4}[^\d]+(\d{1,2}\.\d{2,4})',
+                    r'High[:\s]*\$?\d+\.\d{2,4}[^\d]+(\d{1,2}\.\d{2})',
                 ],
                 'iv': [
                     r'Implied volatility[\s\n]*(\d+\.\d+)%',  # Implied volatility with newline
                     r'Implied volatility[:\s]*(\d+\.\d+)%?',
+                    r'Implied volatility[:\s]*(\d{2}\.\d{2})%?',  # XX.XX format specifically
                     r'(?:Implied\s+)?(?:Vol|Volatility)[:\s]+(\d+\.\d+)%?',
                     r'IV[:\s]+(\d+\.\d+)%?',
-                    r'(\d+\.\d+)%',  # Just find percentage values
+                    r'(\d{2}\.\d{2})%',  # XX.XX format specifically
                 ],
                 'strike': [
                     r'\$(\d{3,4})\s+Call',  # $635 Call format
@@ -1210,6 +1276,11 @@ class SPYExpandedTerminal:
             
             extracted_fields = 0
             for field, pattern_list in patterns.items():
+                # Skip if we already have this field from special patterns
+                if field in data:
+                    extracted_fields += 1
+                    continue
+                    
                 for pattern in pattern_list:
                     try:
                         matches = re.findall(pattern, content, re.IGNORECASE)
@@ -1684,6 +1755,28 @@ class SPYExpandedTerminal:
                                 high = current_data.get('high', 'N/A')
                                 low = current_data.get('low', 'N/A')
                                 self.log(f"📊 High/Low data: High=${high} Low=${low}")
+                                
+                                # Enhanced debug logging for specific values
+                                try:
+                                    page_content = await tracker.page.content()
+                                    
+                                    # Look for "Last trade" specifically
+                                    last_trade_matches = re.findall(r'Last trade[:\s]*\$?(\d+\.\d{2})', page_content)
+                                    if last_trade_matches:
+                                        self.log(f"    ✅ Found Last trade values: {last_trade_matches}")
+                                    
+                                    # Look for implied volatility specifically
+                                    iv_matches = re.findall(r'Implied volatility[:\s]*(\d+\.\d{2})%', page_content)
+                                    if iv_matches:
+                                        self.log(f"    ✅ Found Implied volatility values: {iv_matches}")
+                                    
+                                    # Look for Low value specifically
+                                    low_matches = re.findall(r'Low[:\s]*\$?(\d+\.\d{2})', page_content)
+                                    if low_matches:
+                                        self.log(f"    ✅ Found Low values: {low_matches}")
+                                        
+                                except Exception as debug_error:
+                                    self.log(f"    ⚠️ Debug logging error: {debug_error}")
                                 
                             else:
                                 self.log(f"🔍 Data extraction #{screenshot_count}: FAILED - No data extracted")
